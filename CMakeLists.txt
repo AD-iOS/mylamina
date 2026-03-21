@@ -13,7 +13,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     if(MSVC)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2")
     else ()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -march=native -mtune=native -flto=auto -funroll-loops -finline-functions -finline-small-functions -findirect-inlining -fipa-cp -fipa-cp-clone -fipa-bit-cp -fipa-vrp -fipa-ra -fipa-icf -fdevirtualize-at-ltrans -fvariable-expansion-in-unroller -fipa-sra -fsplit-loops -fsplit-paths -ftree-loop-vectorize -ftree-slp-vectorize -fvect-cost-model=unlimited -ftree-partial-pre -fpeel-loops -fpredictive-commoning -funswitch-loops -fgcse-after-reload -ftree-loop-distribute-patterns -fsee -fipa-pta -fno-semantic-interposition -fno-plt -fmodulo-sched -fmodulo-sched-allow-regmoves -ffunction-sections -fdata-sections -Wl,--gc-sections")
     endif()
 endif ()
 

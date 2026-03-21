@@ -2,6 +2,7 @@
 
 #include <string>
 #include <fstream>
+#include <chrono>
 
 #include "../runtime/loader.hpp"
 #include "../compiler/lexer.hpp"
@@ -39,7 +40,7 @@ int file_run(const std::string& file_name) {
     if (lmx::Generator::node_has_error)return -1;
     gener.ops.emplace_back(lmx::runtime::Opcode::HALT);
     gener.write_binary_file(file_name);
-    gener.print_ops();
+    //gener.print_ops();
     //return 0;
     lmx::runtime::VirtualCore vm;
     vm.set_program(&gener.ops);

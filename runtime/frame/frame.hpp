@@ -10,7 +10,7 @@ namespace lmx::runtime {
     struct StackFrame {
         // size_t local_pc{};
         std::vector<Value> locals{};
-        Value save_regs[12];
+        Value save_regs[4];
         // size_t ret_addr{};
 
         StackFrame() { locals.resize(56); }
