@@ -114,12 +114,19 @@ int VirtualCore::run() {
         const auto args_count = operands[8]; // 传参数量
         ste.cur.push_back(std::make_unique<StackFrame>()); //新建栈帧
         ste.cur.back()->locals.resize(args_count + 1);
+        for (int i=0; i < std::size(ste.cur.back()->save_regs); i++)
+            ste.cur.back()->save_regs[i] = ste.regs[i];
+
         for (uint8_t i = 0; i != args_count; i++) ste.cur.back()->locals[i] = ste.regs[REG_COUNT_INDEX_MAX - i];
         goto RUN_CONTINUE;
     }
     case FRET: {
         ste.pc = ste.ret_addr_stack.back(); //返回地址
         ste.ret_addr_stack.pop_back();
+
+        for (int i=0; i < std::size(ste.cur.back()->save_regs); i++)
+            ste.regs[i] = ste.cur.back()->save_regs[i];
+
         ste.cur.pop_back(); //  恢复栈帧
         goto RUN_CONTINUE;
     }
@@ -185,12 +192,12 @@ int VirtualCore::run() {
         goto RUN_CONTINUE;
     }
     case LOCAL_GET: {
-        ste.regs[operands[0]] = ste.cur[operands[1]]->locals[*(uint16_t*)(operands + 2)];
+        ste.regs[operands[0]] = (&ste.cur.back() - operands[1])->get()->locals[*(uint16_t*)(operands + 2)];
         ste.pc++;
         goto RUN_CONTINUE;
     }
     case LOCAL_SET: {
-        ste.cur[operands[0]]->locals[*(uint16_t*)(operands + 1)] = ste.regs[operands[3]];
+        (&ste.cur.back() - operands[0])->get()->locals[*(uint16_t*)(operands + 1)] = ste.regs[operands[3]];
         ste.pc++;
         goto RUN_CONTINUE;
     }

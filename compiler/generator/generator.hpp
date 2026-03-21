@@ -104,7 +104,7 @@ class LMC_API Generator {
 
         uint16_t new_var(const std::string& n, bool is_mut, uint16_t addr) {
             if (!locals.contains(n)) {
-                if (addr > local_count) {
+                if (addr > local_count || local_count == UINT16_MAX) {
                     locals.reserve(addr + 1);
                     local_count = addr;
                 }
@@ -118,16 +118,16 @@ class LMC_API Generator {
     };
     std::vector<std::unique_ptr<CompilingFrame>> cur;
     /* ====================================== *
-         * function find_var(name)
-         * find the var named `name` up to frames
-         *
-         * @return
-         * 一般情况： （frame*, (mutable, idx))
-         * 未找到情况： （nullptr, (false, UINT16_MAX))
-         * ======================================= */
+     * function find_var(name)
+     * find the var named `name` up to frames
+     *
+     * @return
+     * 一般情况： （frame*, (mutable, idx))
+     * 未找到情况： （nullptr, (false, UINT16_MAX))
+     * ======================================= */
     auto find_var(const std::string& nme) const -> std::pair<size_t, std::pair<bool, uint16_t>> {
         size_t i = 0;
-        for (const auto& c : cur) {
+        for (auto& c : cur | std::views::reverse) {
             for (const auto& [n, l] : c->locals)
                 if (nme == n) return {i, l};
             i++;

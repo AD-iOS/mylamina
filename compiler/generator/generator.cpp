@@ -278,6 +278,8 @@ size_t Generator::gen_binary(std::shared_ptr<ASTNode>& n) {
         error("operator: `" + node->op + "' is not defined.");
         return -1;
     }
+    regs.free(lr);
+    regs.free(rr);
     expr_release = true;
     return expr_ret_reg;
 }
@@ -302,7 +304,7 @@ size_t Generator::gen_assign(std::shared_ptr<ASTNode>& n) {
         }
     } else { //如果未定义
         expr_ret_reg = gen(node->value);
-        LMXOpcodeEmitter::emit_local_set(ops, cur.size() - 1, cur.back()->new_var(node->name, node->is_mut), expr_ret_reg);
+        LMXOpcodeEmitter::emit_local_set(ops, 0, cur.back()->new_var(node->name, node->is_mut), expr_ret_reg);
     }
     regs.free(expr_ret_reg);
     return -1;
@@ -318,7 +320,7 @@ size_t Generator::gen_var_ref(std::shared_ptr<ASTNode>& n) {
         expr_ret_reg = -1;
         error("The var `" + node->name + "` is not found!");
     }
-    expr_release = false;
+    expr_release = true;
     return expr_ret_reg;
 }
 
@@ -343,10 +345,10 @@ size_t Generator::gen_function(std::shared_ptr<ASTNode> &n) {
     }
     new_func(node->name, args_count); //函数不做作用域区分，全部全局
     for (size_t i = 0; i < args_count ; i++) {
-        LMXOpcodeEmitter::emit_local_set(ops, cur.size() - 1, i,  REG_COUNT_INDEX_MAX - i);
+        LMXOpcodeEmitter::emit_local_set(ops, 0, i,  REG_COUNT_INDEX_MAX - i);
         cur.back()->new_var(node->args[i], true, i);
     }
-    if (node->body->kind != BlockStmt) error("expected block statement.");
+    if (node->body->kind != BlockStmt) error("expected block statement");
     basic_gen_block(node->body);
 
     LMXOpcodeEmitter::emit_fret(ops);
