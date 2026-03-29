@@ -21,7 +21,7 @@ if (NOT WASM_TARGET)
     message(STATUS "downloading dyncall...")
     FetchContent_Declare(
         dyncall
-        GIT_REPOSITORY https://bgithub.xyz/ugexe/dyncall.git
+        GIT_REPOSITORY https://github.com/ugexe/dyncall.git
         GIT_TAG        "r1.4"
         OVERRIDE_FIND_PACKAGE
         # 禁用更新检查
