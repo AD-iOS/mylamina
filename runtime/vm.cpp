@@ -4,8 +4,6 @@
 
 #include "vm.hpp"
 #include <cmath>
-#include <iostream>
-#include <ostream>
 
 #include "vmcall.hpp"
 #include "../compiler/generator/generator.hpp"
@@ -123,13 +121,8 @@ int VirtualCore::run() {
     case FRET: {
         ste.pc = ste.ret_addr_stack.back(); //返回地址
         ste.ret_addr_stack.pop_back();
-
-        Value ret_value = ste.regs[0]; // 保存返回值
-
         for (int i = 1; i < std::size(ste.cur.back()->save_regs); i++)
             ste.regs[i] = ste.cur.back()->save_regs[i];
-
-        ste.regs[0] = ret_value; // 恢复返回值
         ste.cur.pop_back(); //  恢复栈帧
         goto RUN_CONTINUE;
     }
