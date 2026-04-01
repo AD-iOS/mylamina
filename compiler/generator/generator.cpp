@@ -64,31 +64,33 @@ std::vector<runtime::Op> &Generator::get_ops() {
 }
 
 size_t Generator::gen(std::shared_ptr<ASTNode> &n) {
-    switch (n->kind) {
-        case Program: return gen_program(n);
-        case Binary: return gen_binary(n);
-        case Unary: return gen_unary(n);
-        case Return: return gen_return(n);
-        case FuncCallExpr: return gen_func_call(n);
-        case VarDecl: return gen_assign(n);
-        case VarRef: return gen_var_ref(n);
-        case NumLiteral: return gen_num(n);
-        case StringLiteral: return gen_string(n);
-        case BoolLiteral: return gen_bool(n);
-        case BlockStmt: return gen_block(n);
-        case IfStmt: return gen_if(n);
-        case FuncDecl: return gen_function(n);
-        case VMCall: return gen_vmc(n);
-        case Module: return gen_module(n);
-        case Use: return gen_use(n);
-        case Loop: return gen_loop(n);
-        case Break: return gen_break(n);
-        case Continue: return gen_continue(n);
-        default: {
-            error("unknown node type");
-            return -1;
+    try {
+        switch (n->kind) {
+            case Program: return gen_program(n);
+            case Binary: return gen_binary(n);
+            case Unary: return gen_unary(n);
+            case Return: return gen_return(n);
+            case FuncCallExpr: return gen_func_call(n);
+            case VarDecl: return gen_assign(n);
+            case VarRef: return gen_var_ref(n);
+            case NumLiteral: return gen_num(n);
+            case StringLiteral: return gen_string(n);
+            case BoolLiteral: return gen_bool(n);
+            case BlockStmt: return gen_block(n);
+            case IfStmt: return gen_if(n);
+            case FuncDecl: return gen_function(n);
+            case VMCall: return gen_vmc(n);
+            case Module: return gen_module(n);
+            case Use: return gen_use(n);
+            case Loop: return gen_loop(n);
+            case Break: return gen_break(n);
+            case Continue: return gen_continue(n);
+            default: error("unknown node type");
         }
+    } catch (const GenerError& e) {
+        print_error(e);
     }
+    return SIZE_MAX;
 }
 
 size_t Generator::gen_program(std::shared_ptr<ASTNode> &n) {

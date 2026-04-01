@@ -61,11 +61,6 @@ bool Parser::is_eof() const {
     return pos >= tokens.size() - 1;
 }
 
-void Parser::check_eof() {
-    while (!is_eof() && match(TokenType::END_OF_FILE)) {
-        advance();
-    }
-}
 void Parser::print_error(const ParserError& error) const {
     std::cerr << std::format(
 "Error: {}\nAt line {}, column {}, in file {}:\n    >>> {}\n       {}",
@@ -80,8 +75,7 @@ void Parser::print_error(const ParserError& error) const {
             pointer.append("^");
             return pointer;
         }()
-    )
-    << std::endl;
+    ) << std::endl;
 }
 void Parser::error(const std::string& msg) {
     has_err = true;
@@ -101,9 +95,10 @@ std::shared_ptr<BlockStmtNode> Parser::parse_block() {
 std::shared_ptr<ExprNode> Parser::parse_expr() {
     std::shared_ptr<ExprNode> node = parse_logical_and();
     std::shared_ptr<TypeNode> type;
-    while (match(TokenType::PIPE) ) {
+    while (match(TokenType::PIPE)) {
         auto op = cur().text;
         advance();
+        alert_eof("expected right operand");
         auto n2 = parse_logical_and();
         if (n2->kind != FuncCallExpr) {
             error("expected func calling expr");
@@ -118,6 +113,7 @@ std::shared_ptr<ExprNode> Parser::parse_logical_and() {
     while (match(TokenType::AND) ) {
         auto op = cur().text;
         advance();
+        alert_eof("expected right operand");
         node = std::make_shared<BinaryNode>(node, parse_logical_or(), op);
     }
     return node;
@@ -127,6 +123,7 @@ std::shared_ptr<ExprNode> Parser::parse_logical_or() {
     while (match(TokenType::OR) ) {
         auto op = cur().text;
         advance();
+        alert_eof("expected right operand");
         node = std::make_shared<BinaryNode>(node, parse_relational(), op);
     }
     return node;
@@ -167,87 +164,95 @@ std::shared_ptr<ASTNode> Parser::parse() {
     static bool in_func = false;
     static bool in_loop = false;
     std::shared_ptr<ASTNode> node;
-    re_parse:
-    switch (cur().type) {
-    case TokenType::COMMENT: advance(); goto re_parse;
-    case TokenType::KW_LET: {
-        advance();
-        if (!match(TokenType::IDENTIFIER)) error("expected identifier");
-        auto name = cur().text;
-        advance();
-        if (!match(TokenType::ASSIGN)) error("expected assignment");
-        advance();
-        node = std::make_shared<VarDeclNode>(name, parse_expr(), false);
-        break;
-    }
-    case TokenType::KW_FUNC: {
-        advance();
-        in_func = true;
-        node = parse_func_decl(true);
-        in_func = false;
-        break;
-    }
-    case TokenType::KW_RETURN: {
-        if (!in_func) error("expected 'return'");
+    try {
+       re_parse:
+       switch (cur().type) {
+            case TokenType::COMMENT: {
+                advance();
+                goto re_parse;
+            }
+            case TokenType::KW_LET: {
+                advance();
+                if (!match(TokenType::IDENTIFIER)) error("expected identifier");
+                auto name = cur().text;
+                advance();
+                if (!match(TokenType::ASSIGN)) error("expected assignment");
+                advance();
+                node = std::make_shared<VarDeclNode>(name, parse_expr(), false);
+                break;
+            }
+            case TokenType::KW_FUNC: {
+                advance();
+                in_func = true;
+                node = parse_func_decl(true);
+                in_func = false;
+                break;
+            }
+            case TokenType::KW_RETURN: {
+                if (!in_func) error("expected 'return'");
 
-        auto line = cur().line;
-        advance();
-        if (cur().line > line) {
-            node = std::make_shared<ReturnStmtNode>(nullptr);
-        } else {
-            auto e = parse_expr();
+                auto line = cur().line;
+                advance();
+                if (cur().line > line) {
+                    node = std::make_shared<ReturnStmtNode>(nullptr);
+                } else {
+                    auto e = parse_expr();
 
-            node = std::make_shared<ReturnStmtNode>(e);
-        }
-        break;
-    }
-    case TokenType::KW_LOOP: {
-        advance();
-        std::shared_ptr<ExprNode> cond = nullptr;
-        if (!match(TokenType::LBRACE))
-            cond = parse_expr();
-        in_loop = true;
-        auto block = parse_block();
-        node = std::make_shared<LoopNode>(cond, block);
-        in_loop = false;
-        break;
-    }
-    case TokenType::KW_BREAK: {
-        advance();
-        if (!in_loop) error("expected 'break', but not in loop");
-        node = std::make_shared<BreakNode>();
-        break;
-    }
-    case TokenType::KW_CONTINUE: {
-        advance();
-        if (!in_loop) error("expected 'continue', but not in loop");
-        node = std::make_shared<ContinueNode>();
-        break;
-    }
-    case TokenType::KW_IF: {
-        advance();
-        node = parse_if();
-        break;
-    }
-    case TokenType::KW_MODULE: {
-        advance();
-        node = parse_module();
-        break;
-    }
-    case TokenType::KW_USE: {
-        advance();
-        auto path = parse_string();
-        break;
-    }
-    default: {
-        if (match(TokenType::IDENTIFIER) && peek_match(TokenType::ASSIGN)) {
-            auto name = cur().text;
-            advance();
-            advance();
-            node = std::make_shared<VarDeclNode>(name, parse_expr());
-        } else node = parse_expr();
-        break;
-    }
+                    node = std::make_shared<ReturnStmtNode>(e);
+                }
+                break;
+            }
+            case TokenType::KW_LOOP: {
+                advance();
+                std::shared_ptr<ExprNode> cond = nullptr;
+                if (!match(TokenType::LBRACE))
+                    cond = parse_expr();
+                in_loop = true;
+                auto block = parse_block();
+                node = std::make_shared<LoopNode>(cond, block);
+                in_loop = false;
+                break;
+            }
+            case TokenType::KW_BREAK: {
+                advance();
+                if (!in_loop) error("expected 'break', but not in loop");
+                node = std::make_shared<BreakNode>();
+                break;
+            }
+            case TokenType::KW_CONTINUE: {
+                advance();
+                if (!in_loop) error("expected 'continue', but not in loop");
+                node = std::make_shared<ContinueNode>();
+                break;
+            }
+            case TokenType::KW_IF: {
+                advance();
+                node = parse_if();
+                break;
+            }
+            case TokenType::KW_MODULE: {
+                advance();
+                node = parse_module();
+                break;
+            }
+            case TokenType::KW_USE: {
+                advance();
+                auto path = parse_string();
+                break;
+            }
+            default: {
+                if (match(TokenType::IDENTIFIER) && peek_match(TokenType::ASSIGN)) {
+                    auto name = cur().text;
+                    advance();
+                    advance();
+                    node = std::make_shared<VarDeclNode>(name, parse_expr());
+                } else node = parse_expr();
+                break;
+            }
+       }
+    } catch (const ParserError& e) {
+        print_error(e);
+        return nullptr;
     }
     return node;
 }
@@ -409,8 +414,13 @@ std::shared_ptr<ExprNode> Parser::term() {
 }
 std::shared_ptr<ProgramASTNode> Parser::parse_program() {
     std::vector<std::shared_ptr<ASTNode>> stmts;
-    while (!match(TokenType::RBRACE) && !is_eof()) {
-        if (const auto stmt = parse()) stmts.push_back(stmt);
+    try {
+        while (!match(TokenType::RBRACE) && !is_eof()) {
+            if (const auto stmt = parse()) stmts.push_back(stmt);
+        }
+    } catch (const ParserError& e) {
+        print_error(e);
+        return nullptr;
     }
     return std::make_shared<ProgramASTNode>(stmts);
 }

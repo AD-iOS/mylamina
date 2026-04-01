@@ -26,17 +26,12 @@ int run_repl() {
             auto tks = l.tokenize(input);
 
             lmx::Parser parser(tks, input, "<shell#>");
-
-            std::shared_ptr<lmx::ASTNode> node;
-            try {
-                node = parser.parse();
-            } catch (const lmx::ParserError& e) {
-                parser.print_error(e);
-            }
+            auto node = parser.parse();
             if (!node || parser.has_error()) continue;
 
             lmx::Generator::node_has_error = false;
             size_t op;
+
             try {
                 op = generator.gen(node);
             } catch (const lmx::GenerError& e) {

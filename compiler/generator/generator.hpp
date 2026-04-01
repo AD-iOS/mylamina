@@ -85,6 +85,12 @@ class LMC_API Generator {
 
     size_t gen_use(std::shared_ptr<ASTNode> &shared);
 
+    size_t gen_loop(const std::shared_ptr<ASTNode> & shared);
+
+    size_t gen_continue(std::shared_ptr<ASTNode> &n);
+
+    size_t gen_break(std::shared_ptr<ASTNode> &n);
+
     [[nodiscard]] auto tagging() const { return ops.size(); }
     void new_frame(const std::string& name) { cur.push_back(std::make_unique<CompilingFrame>(name));}
     void free_frame() { cur.pop_back(); }
@@ -143,16 +149,16 @@ class LMC_API Generator {
         return {SIZE_MAX, {false,UINT16_MAX}};
     }
     std::unordered_map<std::string, std::pair<uint8_t, size_t>> funcs;
-    void new_func(const std::string & name, uint8_t size) {
+
+    void new_func(const std::string & name, uint8_t size, std::optional<size_t> addr = std::nullopt) {
         if (!funcs.contains(name)) {
-            funcs[name] = std::make_pair(size, tagging());
-        } else error("redefined function: `" + name + "`");
+            size_t final_addr = addr.has_value() ? addr.value() : tagging();
+            funcs[name] = std::make_pair(size, final_addr);
+        } else {
+            error("redefined function: `" + name + "`");
+        }
     }
-    void new_func(const std::string & name, uint8_t size, size_t addr) {
-        if (!funcs.contains(name)) {
-            funcs[name] = std::make_pair(size, addr);
-        } else error("redefined function: `" + name + "`");
-    }
+
     bool find_func(const std::string & name) const {
         return funcs.contains(name);
     }
@@ -163,10 +169,14 @@ class LMC_API Generator {
      */
     std::unordered_map<
         std::string,
-        std::pair<size_t,
-            std::vector<    std::shared_ptr<TypeNode>   >
-        >> extern_funcs;
-    static inline runtime::CBasicTypes lmtype2ctype(std::string& lmt) {
+        std::pair<
+            size_t,
+            std::vector<
+                std::shared_ptr<TypeNode>
+            >
+        >
+    > extern_funcs;
+    static runtime::CBasicTypes lmtype2ctype(std::string& lmt) {
         if (lmt.empty()) return runtime::Void;
         if (lmt == "bool") return runtime::CBasicTypes::Bool;
         if (lmt == "num") return runtime::CBasicTypes::LongLong;
@@ -184,30 +194,24 @@ class LMC_API Generator {
 public:
     static bool node_has_error;
     Allocator regs;
-    Generator();
-    ~Generator() = default;
-
     std::vector<runtime::Op> ops;
-    void write(runtime::Op& op);
-
-    std::vector<runtime::Op> &get_ops();
     std::vector<char> constant_pool;
 
-    size_t gen_loop(const std::shared_ptr<ASTNode> & shared);
-
-    size_t gen_continue(std::shared_ptr<ASTNode> &n);
-
-    size_t gen_break(std::shared_ptr<ASTNode> &n);
-
+    Generator();
+    ~Generator() = default;
     size_t gen(std::shared_ptr<ASTNode> &n);
+
+    void write(runtime::Op& op);
+
+    std::vector<runtime::Op>& get_ops();
+    void write_binary_file(const std::string &path);
 
     [[nodiscard]] size_t togging() const {return ops.size();}
 
     void print_ops();
     static void print_ops(std::vector<runtime::Op>& ops);
-    void write_binary_file(const std::string &path);
 
-    void print_vars() {
+    void print_vars() const {
         for (auto& v: cur)
             for (auto& [n, a] : v->locals)
                 std::cout << n << " at address: " << a.second << " mutable: " << (a.first ? "true" : "false") << std::endl;

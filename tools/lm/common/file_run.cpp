@@ -35,11 +35,7 @@ int file_run(const std::string& file_name) {
     lmx::Parser parser(ts, src, file_name);
     lmx::Generator gener;
     std::shared_ptr<lmx::ASTNode> node;
-    try {
-        node = parser.parse_program();
-    } catch (const lmx::ParserError& e) {
-        parser.print_error(e);
-    }
+    node = parser.parse_program();
     if (!node || parser.has_error()) return -1;
     gener.gen(node);
     if (lmx::Generator::node_has_error)return -1;
