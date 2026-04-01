@@ -18,6 +18,7 @@
 
 namespace lmx {
 bool Generator::node_has_error = false;
+std::vector<std::string> Generator::errors = {};
 Allocator::Allocator() {
     bitset.reset();
     bitset.set(0);
@@ -63,41 +64,47 @@ std::vector<runtime::Op> &Generator::get_ops() {
     return ops;
 }
 
-size_t Generator::gen(std::shared_ptr<ASTNode> &n) {
-    try {
-        switch (n->kind) {
-            case Program: return gen_program(n);
-            case Binary: return gen_binary(n);
-            case Unary: return gen_unary(n);
-            case Return: return gen_return(n);
-            case FuncCallExpr: return gen_func_call(n);
-            case VarDecl: return gen_assign(n);
-            case VarRef: return gen_var_ref(n);
-            case NumLiteral: return gen_num(n);
-            case StringLiteral: return gen_string(n);
-            case BoolLiteral: return gen_bool(n);
-            case BlockStmt: return gen_block(n);
-            case IfStmt: return gen_if(n);
-            case FuncDecl: return gen_function(n);
-            case VMCall: return gen_vmc(n);
-            case Module: return gen_module(n);
-            case Use: return gen_use(n);
-            case Loop: return gen_loop(n);
-            case Break: return gen_break(n);
-            case Continue: return gen_continue(n);
-            default: error("unknown node type");
-        }
-    } catch (const GenerError& e) {
-        print_error(e);
+size_t Generator::sub_gen(std::shared_ptr<ASTNode> &n) {
+    switch (n->kind) {
+        case Program: return gen_program(n);
+        case Binary: return gen_binary(n);
+        case Unary: return gen_unary(n);
+        case Return: return gen_return(n);
+        case FuncCallExpr: return gen_func_call(n);
+        case VarDecl: return gen_assign(n);
+        case VarRef: return gen_var_ref(n);
+        case NumLiteral: return gen_num(n);
+        case StringLiteral: return gen_string(n);
+        case BoolLiteral: return gen_bool(n);
+        case BlockStmt: return gen_block(n);
+        case IfStmt: return gen_if(n);
+        case FuncDecl: return gen_function(n);
+        case VMCall: return gen_vmc(n);
+        case Module: return gen_module(n);
+        case Use: return gen_use(n);
+        case Loop: return gen_loop(n);
+        case Break: return gen_break(n);
+        case Continue: return gen_continue(n);
+        default: error("unknown node type");
     }
     return SIZE_MAX;
+}
+
+size_t Generator::gen(std::shared_ptr<ASTNode> &n) {
+    const auto result = sub_gen(n);
+    for (auto const& msg : errors) {
+        std::printf("Error: %s\n", msg.c_str());
+    }
+    errors.clear();
+    ops.emplace_back(runtime::Opcode::HALT);
+    return result;
 }
 
 size_t Generator::gen_program(std::shared_ptr<ASTNode> &n) {
     const auto node = std::static_pointer_cast<ProgramASTNode>(std::move(n));
     size_t last_ret = 0;
     for (auto& c: node->children) {
-        last_ret = gen(c);
+        last_ret = sub_gen(c);
     }
     return last_ret;
 }
@@ -105,7 +112,7 @@ size_t Generator::gen_loop(const std::shared_ptr<ASTNode> &shared) {
     const auto node = std::static_pointer_cast<LoopNode>(std::move(shared));
 
     size_t loop_cond = -1;
-    if (node->condition) loop_cond = gen(node->condition);
+    if (node->condition) loop_cond = sub_gen(node->condition);
     const size_t loop_start = tagging();
 
     size_t break_cond = -1;
@@ -117,7 +124,7 @@ size_t Generator::gen_loop(const std::shared_ptr<ASTNode> &shared) {
         error("should not have a loop body");
         return -1;
     }
-    gen(node->body);
+    sub_gen(node->body);
     const auto continue_point = tagging();
     if (loop_cond != -1)LMXOpcodeEmitter::emit_dec(ops, loop_cond);
     LMXOpcodeEmitter::emit_jmp(ops, loop_start);
@@ -220,14 +227,14 @@ size_t Generator::gen_module(std::shared_ptr<ASTNode> &shared) {
 size_t Generator::gen_use(std::shared_ptr<ASTNode> &shared) {
     const auto node = static_pointer_cast<UseNode>(std::move(shared));
     auto pn = compile(node->path->str);
-    gen(pn);
+    sub_gen(pn);
     return -1;
 }
 
 size_t Generator::gen_binary(std::shared_ptr<ASTNode>& n) {
     const auto node = std::static_pointer_cast<BinaryNode>(std::move(n));
     volatile size_t tmp = regs.alloc();
-    volatile auto lr = gen(node->left);
+    volatile auto lr = sub_gen(node->left);
     LMXOpcodeEmitter::emit_mov_rr(ops, tmp, lr);
     if (expr_release) regs.free(lr);
     lr = tmp;
@@ -239,7 +246,7 @@ size_t Generator::gen_binary(std::shared_ptr<ASTNode>& n) {
         expr_release = true;
         return expr_ret_reg;
     }
-    volatile size_t rr = gen(node->right);
+    volatile size_t rr = sub_gen(node->right);
     tmp = regs.alloc();
     LMXOpcodeEmitter::emit_mov_rr(ops, tmp, rr);
     if (expr_release) regs.free(rr);
@@ -299,13 +306,13 @@ size_t Generator::gen_assign(std::shared_ptr<ASTNode>& n) {
     if (const auto [fst, snd] = find_var(node->name); snd.second != UINT16_MAX) {
         //如果可变
         if (snd.first) {
-            expr_ret_reg = gen(node->value);
+            expr_ret_reg = sub_gen(node->value);
             LMXOpcodeEmitter::emit_local_set(ops, fst, cur[fst]->locals[node->name].second, expr_ret_reg);
         } else {
             error("The var `" + node->name + "' is not mutable.");
         }
     } else { //如果未定义
-        expr_ret_reg = gen(node->value);
+        expr_ret_reg = sub_gen(node->value);
         LMXOpcodeEmitter::emit_local_set(ops, 0, cur.back()->new_var(node->name, node->is_mut), expr_ret_reg);
     }
     regs.free(expr_ret_reg);
@@ -328,7 +335,7 @@ size_t Generator::gen_var_ref(std::shared_ptr<ASTNode>& n) {
 
 size_t Generator::gen_return(std::shared_ptr<ASTNode> &n) {
     const auto node = std::static_pointer_cast<ReturnStmtNode>(std::move(n));
-    const auto expr_ret_reg = gen(node->expr);
+    const auto expr_ret_reg = sub_gen(node->expr);
     LMXOpcodeEmitter::emit_mov_rr(ops, 0, expr_ret_reg);
     LMXOpcodeEmitter::emit_fret(ops);
     if (expr_release) regs.free(expr_ret_reg);
@@ -406,7 +413,7 @@ size_t Generator::basic_gen_func_call(std::shared_ptr<ASTNode> &n, const size_t 
 }
 void Generator::basic_gen_pass_args(std::vector<std::shared_ptr<ASTNode>> &args, size_t args_idx, size_t args_count) {
     for (size_t i = args_idx; i < args_count ; i++) {
-        const auto expr_ret = gen(args[i]);
+        const auto expr_ret = sub_gen(args[i]);
 
         LMXOpcodeEmitter::emit_mov_rr(ops , REG_COUNT_INDEX_MAX - i, expr_ret);
         if (expr_release) regs.free(expr_ret);
@@ -428,7 +435,7 @@ size_t Generator::gen_vmc(std::shared_ptr<ASTNode> &n) {
 
 size_t Generator::gen_unary(std::shared_ptr<ASTNode> &n) {
     const auto node = std::static_pointer_cast<UnaryNode>(std::move(n));
-    const auto expr_ret_reg = gen(node->operand);
+    const auto expr_ret_reg = sub_gen(node->operand);
 
 
     const auto tmp_reg = regs.alloc();
@@ -479,14 +486,14 @@ size_t Generator::basic_gen_block(std::shared_ptr<ASTNode> &n) {
     const auto node = std::static_pointer_cast<BlockStmtNode>(std::move(n));
     size_t expr_ret_reg = 0;
 
-    for (auto& c: node->children) expr_ret_reg = gen(c);
+    for (auto& c: node->children) expr_ret_reg = sub_gen(c);
 
     return expr_ret_reg;
 }
 
 size_t Generator::gen_if(std::shared_ptr<ASTNode> &n) {
     const auto node = std::static_pointer_cast<IfStmtNode>(std::move(n));
-    const auto cond = gen(node->condition);
+    const auto cond = sub_gen(node->condition);
 
     const auto the = tagging();
     LMXOpcodeEmitter::emit_if_true(ops, cond, 0);
@@ -496,13 +503,13 @@ size_t Generator::gen_if(std::shared_ptr<ASTNode> &n) {
 
     auto tmp = tagging();
     memcpy(ops[the].operands + 1, &tmp, sizeof(tmp));
-    gen(node->thenBlock);
+    sub_gen(node->thenBlock);
     const size_t then_end = tagging();
     LMXOpcodeEmitter::emit_jmp(ops, 0);
     tmp = tagging();
     memcpy(ops[els].operands, &tmp, sizeof(tmp));
     if (node->elseBlock)
-        gen(node->elseBlock);
+        sub_gen(node->elseBlock);
 
     tmp = tagging();
     memcpy(ops[then_end].operands, &tmp, sizeof(tmp));

@@ -1,11 +1,11 @@
+#include <chrono>
+
 #include "repl.hpp"
 #include "../compiler/lexer.hpp"
 #include "../compiler/parser.hpp"
 #include "../compiler/generator/generator.hpp"
 #include "../compiler/generator/emit.hpp"
 #include "../runtime/vm.hpp"
-#include "../compiler/ast.hpp"
-#include <chrono>
 
 int run_repl() {
     std::string input;
@@ -30,15 +30,9 @@ int run_repl() {
             if (!node || parser.has_error()) continue;
 
             lmx::Generator::node_has_error = false;
-            size_t op;
 
-            try {
-                op = generator.gen(node);
-            } catch (const lmx::GenerError& e) {
-                lmx::Generator::print_error(e);
-            }
+            const size_t op = generator.gen(node);
             if (lmx::Generator::node_has_error) continue;
-            generator.ops.emplace_back(lmx::runtime::Opcode::HALT);
 
             core.set_constant(generator.constant_pool.data());
             core.run();

@@ -50,7 +50,7 @@ class LMC_API Generator {
      * 标记expr_ret_reg是否可以结束后释放
     =========================== */
     bool expr_release{false};
-
+    static std::vector<std::string> errors;
 
     size_t gen_program(std::shared_ptr<ASTNode>& n);
     size_t gen_binary(std::shared_ptr<ASTNode>& n);
@@ -100,7 +100,7 @@ class LMC_API Generator {
 
     static void error(const std::string& msg) {
         node_has_error = true;
-        throw GenerError(msg);
+        errors.emplace_back(msg);
     }
 
     struct CompilingFrame {
@@ -199,6 +199,7 @@ public:
 
     Generator();
     ~Generator() = default;
+    size_t sub_gen(std::shared_ptr<ASTNode> &n);
     size_t gen(std::shared_ptr<ASTNode> &n);
 
     void write(runtime::Op& op);
