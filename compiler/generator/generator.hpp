@@ -4,6 +4,7 @@
 
 #pragma once
 #include <bitset>
+#include <format>
 #include <functional>
 #include <iostream>
 #include <unordered_map>
@@ -21,6 +22,12 @@
 #include "../../runtime/libloader.hpp"
 
 namespace lmx {
+
+class GenerError final : public std::runtime_error {
+public:
+    explicit GenerError(const std::string& msg)
+        : std::runtime_error(msg) {}
+};
 
 namespace runtime {
 struct Op;
@@ -87,7 +94,7 @@ class LMC_API Generator {
 
     static void error(const std::string& msg) {
         node_has_error = true;
-        std::cerr << "Error: " << msg << std::endl;
+        throw GenerError(msg);
     }
 
     struct CompilingFrame {
@@ -204,6 +211,13 @@ public:
         for (auto& v: cur)
             for (auto& [n, a] : v->locals)
                 std::cout << n << " at address: " << a.second << " mutable: " << (a.first ? "true" : "false") << std::endl;
+    }
+
+    static void print_error(const GenerError& error) {
+        std::cerr << std::format(
+            "Error: {}",
+            error.what()
+        ) << std::endl;
     }
 };
 

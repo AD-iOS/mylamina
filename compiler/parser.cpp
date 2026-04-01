@@ -2,10 +2,10 @@
 // Created by geguj on 2025/12/28.
 //
 
+#include <format>
 #include "parser.hpp"
-#include <stack>
 
-#include "../include/opcode.hpp"
+#define alert_eof(msg)  if (is_eof()) error(msg)
 
 namespace lmx {
 
@@ -43,8 +43,8 @@ void Parser::advance() {
     }
 }
 #define check_type(op) if (match(TokenType::COLON)) { \
-advance();\
-op(parse_type());\
+    advance();\
+    op(parse_type());\
 }
 Token& Parser::cur() const {
     if (pos >= tokens.size()) {
@@ -58,20 +58,34 @@ bool Parser::match(TokenType t) const {
 }
 
 bool Parser::is_eof() const {
-    return pos >= tokens.size();
+    return pos >= tokens.size() - 1;
 }
 
 void Parser::check_eof() {
     while (!is_eof() && match(TokenType::END_OF_FILE)) {
         advance();
     }
-    //if (!is_eof()) {
-    //    error("Expected end of file");
-    //}
+}
+void Parser::print_error(const ParserError& error) const {
+    std::cerr << std::format(
+"Error: {}\nAt line {}, column {}, in file {}:\n    >>> {}\n       {}",
+        error.what(),
+        cur().line,
+        cur().col,
+        filename,
+        code,
+        [&]() -> std::string {
+            std::string pointer;
+            pointer.append(std::string(cur().col, ' '));
+            pointer.append("^");
+            return pointer;
+        }()
+    )
+    << std::endl;
 }
 void Parser::error(const std::string& msg) {
     has_err = true;
-    std::cerr << "Error: " << msg << " at " << cur().line << ":" << cur().col << std::endl;
+    throw ParserError(msg);
 }
 std::shared_ptr<BlockStmtNode> Parser::parse_block() {
     if (!match(TokenType::LBRACE)) error("expected '{'");
@@ -123,6 +137,7 @@ std::shared_ptr<ExprNode> Parser::parse_relational() {
         match(TokenType::LE) || match(TokenType::GE) || match(TokenType::NE)    ) {
         auto op = cur().text;
         advance();
+        alert_eof("expected right operand");
         node = std::make_shared<BinaryNode>(node, parse_expr(), op);
     }
     return node;
@@ -168,7 +183,7 @@ std::shared_ptr<ASTNode> Parser::parse() {
     case TokenType::KW_FUNC: {
         advance();
         in_func = true;
-        node = parse_funcdecl(true);
+        node = parse_func_decl(true);
         in_func = false;
         break;
     }
@@ -313,7 +328,7 @@ std::shared_ptr<TypeNode> Parser::parse_type() {
     return std::make_shared<TypeNode>(basic);
 }
 
-std::shared_ptr<ASTNode> Parser::parse_funcdecl(const bool has_block = true) {
+std::shared_ptr<ASTNode> Parser::parse_func_decl(const bool has_block = true) {
     if (!match(TokenType::IDENTIFIER)) {
         advance();
         error("expected identifier");
@@ -377,6 +392,7 @@ std::shared_ptr<ExprNode> Parser::expr() {
     while (match(TokenType::OPER_PLUS) || match(TokenType::OPER_MINUS)) {
         auto op = cur().text;
         advance();
+        alert_eof("expected right operand");
         node = std::make_shared<BinaryNode>(node, term(), op);
     }
     return node;
@@ -386,6 +402,7 @@ std::shared_ptr<ExprNode> Parser::term() {
     while (match(TokenType::OPER_MUL) || match(TokenType::OPER_DIV) || match(TokenType::OPER_MOD) || match(TokenType::OPER_POW)) {
         auto op = cur().text;
         advance();
+        alert_eof("expected right operand");
         node = std::make_shared<BinaryNode>(node, factor(), op);
     }
     return node;
@@ -477,3 +494,5 @@ bool Parser::peek_match(TokenType type) const {
     return tokens[pos + 1].type == type;
 }
 } // lmx
+
+#undef alert_eof

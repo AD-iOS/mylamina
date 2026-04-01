@@ -5,6 +5,7 @@
 #pragma once
 #include <iostream>
 #include <memory>
+#include <utility>
 
 #include "../include/lmx_export.hpp"
 #include "lexer.hpp"
@@ -12,10 +13,17 @@
 
 namespace lmx {
 
+class ParserError final : public std::runtime_error {
+public:
+    explicit ParserError(const std::string& msg)
+        : std::runtime_error(msg) {}
+};
+
 class LMC_API Parser {
     bool in_module{false};
     bool has_err{false};
     std::vector<Token>& tokens;
+    std::string code, filename;
     size_t pos{0};
 
     void parse_args(std::vector<std::shared_ptr<ASTNode>> &args);
@@ -30,31 +38,26 @@ class LMC_API Parser {
 
     std::shared_ptr<ExprNode> factor();
 
-    std::shared_ptr<ExprNode> parse_func_call();
-
-    bool peek_match(TokenType type) const;
+    [[nodiscard]] bool peek_match(TokenType type) const;
 
     void check_eof();
 
     void error(const std::string& msg);
 
     std::shared_ptr<BlockStmtNode> parse_block();
-
     std::shared_ptr<StringNode> parse_string();
-
     std::shared_ptr<ASTNode> parse_if();
     std::shared_ptr<ExprNode> parse_expr();
-
     std::shared_ptr<ExprNode> parse_logical_and();
-
     std::shared_ptr<ExprNode> parse_relational();
-
     std::shared_ptr<ExprNode> parse_logical_or();
-
-    std::shared_ptr<ASTNode> parse_funcdecl(bool has_block);
+    std::shared_ptr<ASTNode> parse_func_decl(bool has_block);
+    std::shared_ptr<ExprNode> parse_func_call();
 
 public:
-    explicit Parser(std::vector<Token>& tokens): tokens(tokens) {}
+    explicit Parser(std::vector<Token>& tokens,
+        std::string code = "",
+        std::string filename = "<unknown>"): tokens(tokens), code(std::move(code)), filename(std::move(filename)) {}
 
     std::shared_ptr<ASTNode> parse();
 
@@ -64,7 +67,9 @@ public:
 
 
     std::shared_ptr<ProgramASTNode> parse_program();
-    [[nodiscard]] bool error() const {return has_err;}
+    [[nodiscard]] bool has_error() const {return has_err;}
+
+    void print_error(const ParserError& error) const;
 };
 
 } // lmx
