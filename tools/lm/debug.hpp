@@ -5,6 +5,9 @@
 #pragma once
 
 #define DEBUGGING
+
+#undef DEBUGGING
+
 #ifdef DEBUGGING
 
 constexpr const char* get_filename(const char* path) {
