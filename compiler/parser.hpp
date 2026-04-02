@@ -29,7 +29,7 @@ class LMC_API Parser {
 
     void parse_args(std::vector<std::shared_ptr<ASTNode>> &args);
 
-    void advance();
+    void advance(ssize_t steps = 1);
     [[nodiscard]] Token& cur() const;
     [[nodiscard]] bool match(TokenType t) const;
     [[nodiscard]] bool is_eof() const;

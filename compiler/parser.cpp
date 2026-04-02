@@ -5,6 +5,8 @@
 #include <format>
 #include "parser.hpp"
 
+#include "../tools/lm/debug.hpp"
+
 #define alert_eof(msg)  if (is_eof()) error(msg)
 
 namespace lmx {
@@ -12,7 +14,7 @@ namespace lmx {
 void Parser::parse_args(std::vector<std::shared_ptr<ASTNode>> &args) {
     if (!match(TokenType::LPAREN)) {
         advance();
-        error("expected '(')");
+        error(std::format("expected '(', got {}", cur().text));
         return;
     }
     advance();
@@ -35,11 +37,16 @@ void Parser::parse_args(std::vector<std::shared_ptr<ASTNode>> &args) {
     }
 }
 
-void Parser::advance() {
-    if (pos < tokens.size()) {
-        pos++;
+void Parser::advance(const ssize_t steps) {
+    if (pos < tokens.size() - steps + 1) {
+        pos += steps;
         if (cur().type == TokenType::COMMENT) advance();
         if (cur().type == TokenType::UNKNOWN) error("unknown token: `" + cur().text + "`");
+    } else {
+        throw std::runtime_error(std::format(
+        "pos: {}, steps: {}, tokens size: {}, index out of range",
+        pos, steps, tokens.size())
+        );
     }
 }
 #define check_type(op) if (match(TokenType::COLON)) { \
@@ -54,6 +61,7 @@ Token& Parser::cur() const {
 }
 
 bool Parser::match(TokenType t) const {
+    LOG("compare: " << ITIS(cur().type, static_cast<int>) << ", " << ITIS(t, static_cast<int>));
     return cur().type == t;
 }
 
@@ -246,7 +254,9 @@ std::shared_ptr<ASTNode> Parser::parse() {
                     advance();
                     advance();
                     node = std::make_shared<VarDeclNode>(name, parse_expr());
-                } else node = parse_expr();
+                } else {
+                    node = parse_expr();
+                }
                 break;
             }
        }
@@ -372,7 +382,8 @@ std::shared_ptr<ASTNode> Parser::parse_func_decl(const bool has_block = true) {
         node->args_type = std::move(args_type);
         node->ret_type = std::move(ret_type);
         return node;
-    } else if (match(TokenType::ASSIGN)) {  // 外部导入情况
+    }
+    if (match(TokenType::ASSIGN)) {  // 外部导入情况
         advance();
         if (!match(TokenType::STRING_LITERAL)) {
             error("expected string literal");
@@ -384,12 +395,21 @@ std::shared_ptr<ASTNode> Parser::parse_func_decl(const bool has_block = true) {
         node->args_type = std::move(args_type);
         node->ret_type = std::move(ret_type);
         return node;
-    } else {    // 仅声明情况
-        auto node = std::make_shared<FuncDeclNode>(name, params, nullptr);
-        node->args_type = std::move(args_type);
-        node->ret_type = std::move(ret_type);
-        return node;
     }
+    // 仅声明情况
+    auto node = std::make_shared<FuncDeclNode>(name, params, nullptr);
+    node->args_type = std::move(args_type);
+    node->ret_type = std::move(ret_type);
+    return node;
+}
+
+std::shared_ptr<ExprNode> Parser::parse_func_call() {
+    auto const func_name = cur().text;
+    LOG(ITIS(func_name));
+    std::vector<std::shared_ptr<ASTNode>> args;
+    advance();
+    parse_args(args);
+    return std::make_shared<FuncCallExprNode>(func_name, args);
 }
 
 std::shared_ptr<ExprNode> Parser::expr() {
@@ -445,6 +465,11 @@ std::shared_ptr<ExprNode> Parser::factor() {
     } else if (match(TokenType::IDENTIFIER)) {
         auto name = cur().text;
         advance();
+        if (match(TokenType::LPAREN)) {
+            advance(-1);
+            fact = parse_func_call();
+            return fact;
+        }
         while (match(TokenType::DOT)) {
             name += cur().text;
             advance();
