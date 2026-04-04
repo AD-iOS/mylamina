@@ -37,7 +37,7 @@ void Parser::parse_args(std::vector<std::shared_ptr<ASTNode>> &args) {
     }
 }
 
-void Parser::advance(const ssize_t steps) {
+void Parser::advance(const ptrdiff_t steps) {
     if (pos < tokens.size() - steps + 1) {
         pos += steps;
         if (cur().type == TokenType::COMMENT) advance();
