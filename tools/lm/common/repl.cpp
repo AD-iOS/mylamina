@@ -1,52 +1,48 @@
+#include <chrono>
+
 #include "repl.hpp"
 #include "../compiler/lexer.hpp"
 #include "../compiler/parser.hpp"
 #include "../compiler/generator/generator.hpp"
 #include "../compiler/generator/emit.hpp"
 #include "../runtime/vm.hpp"
-#include "../compiler/ast.hpp"
-#include <chrono>
 
 int run_repl() {
-    std::string expr;
-    lmx::Lexer l(expr);
-    lmx::Generator gener;
+    std::string input;
+    lmx::Lexer l(input);
+    lmx::Generator generator;
     lmx::runtime::VirtualCore core;
-    core.set_program(&gener.ops);
+    core.set_program(&generator.ops);
 
-    std::string prompt = ">>>";
+    const std::string prompt = "\033[35m>>> \033[0m";
     while (true) {
-        std::cout << std::flush << prompt << std::flush;
-        if (!std::getline(std::cin, expr)) break;
-        //switch (ss.view().back()) {
-        //    case '+': case '-': case '*': case '/': case '=': case '!': case '~': case '{' :case '[': prompt = "..."; continue;
-        //    default: break;
-        //}
-        if (expr == ":lastret") std::cout << core.look_register(0) << std::endl;
-        else if (expr == ":exit") break;
-        else if (expr == ":op") gener.print_ops();
-        else if (expr == ":vars") gener.print_vars();
+        std::cout << prompt << std::flush;
+        if (!std::getline(std::cin, input)) break;
+        if (input == ":lastret") std::cout << core.look_register(0) << std::endl;
+        else if (input == ":exit") break;
+        else if (input == ":op") generator.print_ops();
+        else if (input == ":vars") generator.print_vars();
         else {
-            std::vector<lmx::Token> tks = l.tokenize(expr);
-            lmx::Parser parser(tks);
+            auto tks = l.tokenize(input);
+
+            lmx::Parser parser(tks, input, "<shell#>");
             auto node = parser.parse();
-            if (!node || parser.error()) continue;
-            const auto op = gener.gen(node);
+            if (!node || parser.has_error()) continue;
+
+            lmx::Generator::node_has_error = false;
+
+            const size_t op = generator.gen(node);
             if (lmx::Generator::node_has_error) continue;
-            gener.ops.emplace_back(lmx::runtime::Opcode::HALT);
-            //gener.print_ops();
-            //continue;
-            core.set_constant(gener.constant_pool.data());
-            //const auto start = std::chrono::high_resolution_clock::now();
+
+            core.set_constant(generator.constant_pool.data());
             core.run();
-            //const auto end = std::chrono::high_resolution_clock::now();
 
             if (op != -1) {
-                gener.regs.free(op);
-                std::cout << "Result: " << core.look_register(op) << std::endl;
+                generator.regs.free(op);
+                std::cout << core.look_register(op) << std::endl;
             }
-            //std::cout << "time " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start) << std::endl;
-            if (gener.ops.back().op == lmx::runtime::Opcode::HALT) gener.ops.pop_back();
+
+            if (generator.ops.back().op == lmx::runtime::Opcode::HALT) generator.ops.pop_back();
         }
     }
     return 0;
