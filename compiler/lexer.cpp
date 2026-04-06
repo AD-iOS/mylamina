@@ -28,6 +28,10 @@ void Lexer::advance() {
     } else col++;
 }
 
+bool Lexer::valid_pos() const {
+    return pos < content.size();
+}
+
 Token Lexer::next() {
     while (isspace(content[pos])) {
         advance();
@@ -104,9 +108,12 @@ Token Lexer::next() {
         case '"': {
             advance();
             std::string str;
-            while (content[pos] != '"') {
+            if (!valid_pos()) return {TokenType::UNKNOWN, "", line, col - 1};
+
+            while (valid_pos() && content[pos] != '"') {
                 if (content[pos] == '\\') {
                     advance();
+                    if (!valid_pos()) return {TokenType::UNKNOWN, "", line, col - 1};
                     switch (content[pos]) {
                         case 'n': str += '\n'; break;
                         case 't': str += '\t'; break;
@@ -123,9 +130,12 @@ Token Lexer::next() {
                 str += content[pos];
                 advance();
             }
-            advance();
+            if (!valid_pos() || content[pos] != '"')
+                return {TokenType::UNKNOWN, str, line, col - str.size() - 1};
 
-            return {TokenType::STRING_LITERAL, str, line, col - str.size()};
+            advance();
+            LOG("Content of the STRING_LITERAL: " << str);
+            return {TokenType::STRING_LITERAL, str, line, col - str.size() - 1};
         }
         case '(': {
             advance();
@@ -253,7 +263,7 @@ std::vector<Token> Lexer::tokenize(const std::string& code) {
         LOG("Pushing...");
     }
     if (tokens.empty() || tokens.back().type != TokenType::END_OF_FILE) tokens.push_back({TokenType::END_OF_FILE, "", line, col});
-    for (auto const &token : tokens) {
+    for ([[maybe_unused]] auto const &token : tokens) {
         LOG(ITIS(token));
     }
     const std::string res = error(tokens, orig_line);

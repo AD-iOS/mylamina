@@ -88,6 +88,8 @@ class LMC_API Lexer {
 
     Token next();
     void advance();
+    [[nodiscard]] bool valid_pos() const;
+
 public:
     explicit Lexer(std::string& code, std::string filename = "<unknown>"): content(code), filename(std::move(filename)) {}
     std::string error(const std::vector<Token>& tokens, size_t origin_lineno);
