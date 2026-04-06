@@ -266,25 +266,41 @@ std::vector<Token> Lexer::tokenize(const std::string& code) {
 
 std::string Lexer::error(const std::vector<Token>& tokens, const size_t origin_lineno) {
     std::string k;
+
+    std::unordered_map<size_t, std::vector<size_t>> line_errors;
     for (const auto& token : tokens) {
         if (token.type == TokenType::UNKNOWN) {
-            std::string line_content = [&]{
-                std::istringstream iss(content);
-                std::string line_con;
-                for (size_t i = 0; i < token.line - origin_lineno - 1; ++i) {
-                    if (!std::getline(iss, line_con)) return std::string("");
-                }
-                std::getline(iss, line_con);
-                return line_con;
-            }();
-
-            k += std::format("In line {}, column {}, file {}:\n>>> {}\n    {}\n",
-                token.line, token.col, filename,
-                line_content,
-                std::string(token.col - 1, ' ') + '^'
-            );
+            line_errors[token.line].push_back(token.col);
         }
     }
+
+    for (const auto& [lineno, cols] : line_errors) {
+        std::string line_content = [&]{
+            std::istringstream iss(content);
+            std::string line_con;
+            for (size_t i = 0; i < lineno - origin_lineno - 1; i++) {
+                if (!std::getline(iss, line_con)) return std::string("");
+            }
+            std::getline(iss, line_con);
+            return line_con;
+        }();
+
+        auto caret_line = [&]{
+            if (cols.empty()) return std::string{};
+            std::string str(cols.back() + 1, ' ');
+            for (const size_t col : cols) str[col - 1] = '^';
+            return str;
+        }();
+
+        k += std::format(
+            "In line {}, file {}:\n>>> {}\n    {}\n",
+            lineno,
+            filename,
+            line_content,
+            caret_line
+        );
+    }
+
     return k;
 }
 
