@@ -32,18 +32,19 @@ int file_run(const std::string& file_name) {
     auto src = std::string(std::istreambuf_iterator(file), std::istreambuf_iterator<char>());
     lmx::Lexer lexer(src);
     auto ts = lexer.tokenize(src);
+    if (lexer.has_err) return -1;
     lmx::Parser parser(ts, src, file_name);
-    lmx::Generator gener;
+    lmx::Generator generator;
     std::shared_ptr<lmx::ASTNode> node;
     node = parser.parse_program();
     if (!node || parser.has_error()) return -1;
-    gener.gen(node);
-    if (lmx::Generator::node_has_error)return -1;
-    gener.ops.emplace_back(lmx::runtime::Opcode::HALT);
-    gener.write_binary_file(file_name);
+    generator.gen(node);
+    if (lmx::Generator::node_has_error) return -1;
+    generator.ops.emplace_back(lmx::runtime::Opcode::HALT);
+    generator.write_binary_file(file_name);
     lmx::runtime::VirtualCore vm;
-    vm.set_program(&gener.ops);
-    vm.set_constant(gener.constant_pool.data());
+    vm.set_program(&generator.ops);
+    vm.set_constant(generator.constant_pool.data());
 
     return vm.run();
 }

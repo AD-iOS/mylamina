@@ -3,127 +3,100 @@
 //
 
 #include "lexer.hpp"
+#include "../tools/lm/debug.hpp"
 
+#include <algorithm>
+#include <format>
 #include <unordered_map>
 #include <iostream>
+#include <sstream>
 
 namespace lmx {
 
 std::ostream& operator<<(std::ostream& os, const Token& t) {
-    os << "Token(";
-    switch (t.type) {
-    case TokenType::END_OF_FILE: os << "END_OF_FILE"; break;
-    case TokenType::IDENTIFIER: os << "IDENTIFIER"; break;
-    case TokenType::NUM_LITERAL: os << "INT_LITERAL"; break;
-    case TokenType::STRING_LITERAL: os << "STRING_LITERAL"; break;
-    case TokenType::COMMA: os << "COMMA"; break;
-    case TokenType::TRUE_LITERAL: os << "TRUE_LITERAL"; break;
-        case TokenType::FALSE_LITERAL: os << "FALSE_LITERAL"; break;
-    case TokenType::OPER_PLUS: os << "OPER_PLUS"; break;
-    case TokenType::OPER_MINUS: os << "OPER_MINUS"; break;
-    case TokenType::OPER_MUL: os << "OPER_MUL"; break;
-    case TokenType::OPER_DIV: os << "OPER_DIV"; break;
-    case TokenType::OPER_MOD: os << "OPER_MOD"; break;
-    case TokenType::EQ: os << "EQ"; break;
-    case TokenType::GE: os << "GE"; break;
-    case TokenType::GT: os << "GT"; break;
-    case TokenType::LE: os << "LE"; break;
-    case TokenType::LT: os << "LT"; break;
-    case TokenType::COLON: os << "COLON"; break;
-    case TokenType::COL_COLON: os << "COL_COLON"; break;
-    case TokenType::OPER_POW: os << "OPER_POW"; break;
-    case TokenType::ASSIGN: os << "ASSIGN"; break;
-    case TokenType::NOT: os << "NOT"; break;
-    case TokenType::NE: os << "NE"; break;
-    case TokenType::LPAREN: os << "LPAREN"; break;
-    case TokenType::RPAREN: os << "RPAREN"; break;
-    case TokenType::LBRACK: os << "LBRACK"; break;
-    case TokenType::RBRACK: os << "RBRACK"; break;
-    case TokenType::LBRACE: os << "LBRACE"; break;
-    case TokenType::RBRACE: os << "RBRACE"; break;
-
-    case TokenType::UNKNOWN: os << "UNKNOWN"; break;
-    case TokenType::KW_FUNC: os << "KEYWORD_FUNC"; break;
-    case TokenType::KW_RETURN: os << "KEYWORD_RETURN"; break;
-    default: os << "UNKNOWN";
-    }
-    os << ", " << t.text << ", " << t.line << ", " << t.col << ')';
+    os << "Token(" << to_string(t.type)
+       << ", " << t.text << ", " << t.line << ", " << t.col << ')';
+    LOG(ITIS(t.text) << ", " << ITIS(t.line) << ", " << ITIS(t.col));
     return os;
 }
 
 void Lexer::advance() {
     pos++;
-    if (src[pos] == '\n') {
+    if (content[pos] == '\n') {
         line++;
         col = 1;
     } else col++;
 }
 
 Token Lexer::next() {
-    while (isspace(src[pos])) {
+    while (isspace(content[pos])) {
         advance();
+        LOG("advance!");
     }
-    if (pos >= src.size()) return {TokenType::END_OF_FILE,"", line, col};
+    if (pos >= content.size()) {
+        LOG("Directly EOF!");
+        return {TokenType::END_OF_FILE,"", line, col};
+    }
 
-    switch (src[pos]) {
+    switch (content[pos]) {
         case '+': {
             advance();
-            return {TokenType::OPER_PLUS, "+", line, col};
+            return {TokenType::OPER_PLUS, "+", line, col - 1};
         }
         case '-': {
             advance();
-            return {TokenType::OPER_MINUS, "-", line, col};
+            return {TokenType::OPER_MINUS, "-", line, col - 1};
         }
         case '*': {
             advance();
-            return {TokenType::OPER_MUL, "*", line, col};
+            return {TokenType::OPER_MUL, "*", line, col - 1};
         }
         case '/': {
             advance();
-            return {TokenType::OPER_DIV, "/", line, col};
+            return {TokenType::OPER_DIV, "/", line, col - 1};
         }
         case '%': {
             advance();
-            return {TokenType::OPER_MOD, "%", line, col};
+            return {TokenType::OPER_MOD, "%", line, col - 1};
         }
         case '=': {
             advance();
-            if (src[pos] == '=') {
+            if (content[pos] == '=') {
                 advance();
-                return {TokenType::EQ, "==", line, col};
+                return {TokenType::EQ, "==", line, col - 1};
             }
-            return {TokenType::ASSIGN, "=", line, col};
+            return {TokenType::ASSIGN, "=", line, col - 1};
         }
         case '>': {
             advance();
-            if (src[pos] == '=') {
+            if (content[pos] == '=') {
                 advance();
-                return {TokenType::GE, ">=", line, col};
+                return {TokenType::GE, ">=", line, col - 1};
             }
-            return {TokenType::GT, ">", line, col};
+            return {TokenType::GT, ">", line, col - 1};
         }
         case '<': {
             advance();
-            if (src[pos] == '=') {
+            if (content[pos] == '=') {
                 advance();
-                return {TokenType::LE, "<=", line, col};
+                return {TokenType::LE, "<=", line, col - 1};
             }
-            return {TokenType::LT, "<", line, col};
+            return {TokenType::LT, "<", line, col - 1};
         }
         case ':': {
             advance();
-            if (src[pos] == ':') {
+            if (content[pos] == ':') {
                 advance();
-                return {TokenType::COL_COLON, "::", line, col};
+                return {TokenType::COL_COLON, "::", line, col - 1};
             }
-            return {TokenType::COLON, ":", line, col};
+            return {TokenType::COLON, ":", line, col - 1};
         }
         case '^': {
             advance();
-            return {TokenType::OPER_POW, "^", line, col};
+            return {TokenType::OPER_POW, "^", line, col - 1};
         }
         case '#': {
-            while (pos <= src.size() && src[pos] != '\n' )
+            while (pos <= content.size() && content[pos] != '\n' )
                 advance();
             advance();
             return {TokenType::COMMENT, {}, line, col};
@@ -131,10 +104,10 @@ Token Lexer::next() {
         case '"': {
             advance();
             std::string str;
-            while (src[pos] != '"') {
-                if (src[pos] == '\\') {
+            while (content[pos] != '"') {
+                if (content[pos] == '\\') {
                     advance();
-                    switch (src[pos]) {
+                    switch (content[pos]) {
                         case 'n': str += '\n'; break;
                         case 't': str += '\t'; break;
                         case 'r': str += '\r'; break;
@@ -142,12 +115,12 @@ Token Lexer::next() {
                         case 'f': str += '\f'; break;
                         case 'v': str += '\v'; break;
                         case '0': str += '\0'; break;
-                        default: str += src[pos]; break;
+                        default: str += content[pos]; break;
                     }
                     advance();
                     continue;
                 }
-                str += src[pos];
+                str += content[pos];
                 advance();
             }
             advance();
@@ -156,83 +129,83 @@ Token Lexer::next() {
         }
         case '(': {
             advance();
-            return {TokenType::LPAREN, "(", line, col};
+            return {TokenType::LPAREN, "(", line, col - 1};
         }
         case ')': {
             advance();
-            return {TokenType::RPAREN, ")", line, col};
+            return {TokenType::RPAREN, ")", line, col - 1};
         }
         case '{': {
             advance();
-            return {TokenType::LBRACE, "{", line, col};
+            return {TokenType::LBRACE, "{", line, col - 1};
         }
         case '}': {
             advance();
-            return {TokenType::RBRACE, "}", line, col};
+            return {TokenType::RBRACE, "}", line, col - 1};
         }
         case '[': {
             advance();
-            return {TokenType::LBRACK, "[", line, col};
+            return {TokenType::LBRACK, "[", line, col - 1};
         }
         case ']': {
             advance();
-            return {TokenType::RBRACK, "]", line, col};
+            return {TokenType::RBRACK, "]", line, col - 1};
         }
         case ',': {
             advance();
-            return {TokenType::COMMA, ", ", line, col};
+            return {TokenType::COMMA, ", ", line, col - 1};
         }
         case '!': {
             advance();
-            if (src[pos] == '=') {
+            if (content[pos] == '=') {
                 advance();
-                return {TokenType::NE, "!=", line, col};
+                return {TokenType::NE, "!=", line, col - 1};
             }
-            return {TokenType::NOT, "!", line, col};
+            return {TokenType::NOT, "!", line, col - 1};
         }
         case '|': {
             advance();
-            if (src[pos] == '>') {
+            if (content[pos] == '>') {
                 advance();
-                return {TokenType::PIPE, "|>", line, col};
+                return {TokenType::PIPE, "|>", line, col - 1};
             }
-            if (src[pos] == '|') {
+            if (content[pos] == '|') {
                 advance();
-                return {TokenType::OR, "||", line, col};
+                return {TokenType::OR, "||", line, col - 1};
             }
-            return {TokenType::UNKNOWN, std::string(1, src[pos]), line, col};
+            return {TokenType::UNKNOWN, std::string(1, content[pos]), line, col - 1};
         }
         case '&': {
             advance();
-            if (src[pos] == '&') {
+            if (content[pos] == '&') {
                 advance();
-                return {TokenType::AND, "&&", line, col};
+                return {TokenType::AND, "&&", line, col - 1};
             }
-            return {TokenType::UNKNOWN, std::string(1, src[pos]), line, col};
+            return {TokenType::UNKNOWN, std::string(1, content[pos]), line, col - 1};
         }
         case '.': {
             advance();
-            return {TokenType::DOT, ".", line, col};
+            return {TokenType::DOT, ".", line, col - 1};
         }
         default: {
-            if (isdigit(src[pos])) {
-                auto cur_line = line, cur_col = col;
+            if (isdigit(content[pos])) {
+                const auto cur_line = line, cur_col = col;
                 std::string num;
-                while (isdigit(src[pos]) || src[pos] == '_') {
-                    if (src[pos] == '_') {
+                while (isdigit(content[pos]) || content[pos] == '_') {
+                    if (content[pos] == '_') {
                         advance();
                         continue;
                     }
-                    num += src[pos];
+                    num += content[pos];
                     advance();
                 }
                 return {TokenType::NUM_LITERAL, num, cur_line, cur_col};
             }
-            if (isalpha(src[pos]) || src[pos] == '_') {
+            if (isalpha(content[pos]) || content[pos] == '_') {
                 std::string id;
                 auto cur_line = line, cur_col = col;
-                while (isalnum(src[pos])|| src[pos] == '_') {
-                    id += src[pos];
+                while (isalnum(content[pos])|| content[pos] == '_') {
+                    id += content[pos];
                     advance();
                 }
                 static const std::unordered_map<std::string, TokenType> keywords = {
@@ -256,23 +229,63 @@ Token Lexer::next() {
         }
     }
 
-    auto token = Token{TokenType::UNKNOWN, std::string(1, src[pos]), line, col};
+    auto token = Token{TokenType::UNKNOWN, std::string(1, content[pos]), line, col};
     advance();
+    LOG("Will be UNKNOWN: Token: " << ITIS(token.col) << ", " << ITIS(token.line));
     return token;
 }
 
-std::vector<Token> Lexer::tokenize(const std::string& new_src) {
-    src = new_src;
+std::vector<Token> Lexer::tokenize(const std::string& code) {
+    content = code;
+    has_err = false;
     pos = 0;
-    line = 1;
+    LOG(ITIS(line));
+    const auto orig_line = line;
+    line += [&]() -> size_t {
+        if (content.empty()) return 0;
+        return std::ranges::count(content, '\n') + 1;
+    }();
+    LOG("now: " << ITIS(line) << ", " << ITIS(orig_line) << ", " << ITIS(col));
     col = 1;
     std::vector<Token> tokens;
-    while (pos < src.size()) {
+    while (pos < content.size()) {
         tokens.push_back(next());
+        LOG("Pushing...");
     }
-    // Add EOF token at the end
-    tokens.push_back({TokenType::END_OF_FILE, "", line, col});
-    return tokens;
+    if (tokens.empty() || tokens.back().type != TokenType::END_OF_FILE) tokens.push_back({TokenType::END_OF_FILE, "", line, col});
+    for (auto const &token : tokens) {
+        LOG(ITIS(token));
+    }
+    const std::string res = error(tokens, orig_line);
+    if (res.empty()) return tokens;
+    LOG("Error!");
+    has_err = true;
+    std::cerr << res << std::endl;
+    return {};
+}
+
+std::string Lexer::error(const std::vector<Token>& tokens, const size_t origin_lineno) {
+    std::string k;
+    for (const auto& token : tokens) {
+        if (token.type == TokenType::UNKNOWN) {
+            std::string line_content = [&]{
+                std::istringstream iss(content);
+                std::string line_con;
+                for (size_t i = 0; i < token.line - origin_lineno - 1; ++i) {
+                    if (!std::getline(iss, line_con)) return std::string("");
+                }
+                std::getline(iss, line_con);
+                return line_con;
+            }();
+
+            k += std::format("In line {}, column {}, file {}:\n>>> {}\n    {}\n",
+                token.line, token.col, filename,
+                line_content,
+                std::string(token.col - 1, ' ') + '^'
+            );
+        }
+    }
+    return k;
 }
 
 }
