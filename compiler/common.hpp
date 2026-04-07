@@ -26,13 +26,14 @@ namespace lmx {
             std::cerr << "Failed to open file " << path << std::endl;
             return {};
         }
-        return std::string(std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{});
+        return {std::istreambuf_iterator{file}, std::istreambuf_iterator<char>{}};
     }
     inline std::shared_ptr<ASTNode> compile(const std::string &path) {
         std::string code = read_file(path);
         if (code.empty())  return nullptr;
         Lexer lexer(code);
         auto tks = lexer.tokenize(code);
+        if (lexer.has_err) return nullptr;
 
         Parser parser(tks);
         if (auto node = parser.parse_program(); node && !parser.has_error()) return node;

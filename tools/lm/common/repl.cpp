@@ -6,16 +6,18 @@
 #include "../compiler/generator/generator.hpp"
 #include "../compiler/generator/emit.hpp"
 #include "../runtime/vm.hpp"
+#include "../tools/lm/debug.hpp"
 
 int run_repl() {
     std::string input;
-    lmx::Lexer l(input);
+    lmx::Lexer l(input, "<shell#>");
     lmx::Generator generator;
     lmx::runtime::VirtualCore core;
     core.set_program(&generator.ops);
 
     const std::string prompt = "\033[35m>>> \033[0m";
     while (true) {
+        LOG("Getting input");
         std::cout << prompt << std::flush;
         if (!std::getline(std::cin, input)) break;
         if (input == ":lastret") std::cout << core.look_register(0) << std::endl;
@@ -24,6 +26,7 @@ int run_repl() {
         else if (input == ":vars") generator.print_vars();
         else {
             auto tks = l.tokenize(input);
+            if (l.has_err) continue;
 
             lmx::Parser parser(tks, input, "<shell#>");
             auto node = parser.parse();
