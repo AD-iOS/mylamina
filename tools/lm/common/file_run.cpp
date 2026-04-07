@@ -30,7 +30,7 @@ int file_run(const std::string& file_name) {
     if (magic == LMX_MAGIC_NUM) return binary_run(std::move(file));
     file.seekg(0, std::ios::beg);
     auto src = std::string(std::istreambuf_iterator(file), std::istreambuf_iterator<char>());
-    lmx::Lexer lexer(src);
+    lmx::Lexer lexer(src, file_name);
     auto ts = lexer.tokenize(src);
     if (lexer.has_err) return -1;
     lmx::Parser parser(ts, src, file_name);

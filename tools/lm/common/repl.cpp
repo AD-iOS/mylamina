@@ -10,7 +10,7 @@
 
 int run_repl() {
     std::string input;
-    lmx::Lexer l(input);
+    lmx::Lexer l(input, "<shell#>");
     lmx::Generator generator;
     lmx::runtime::VirtualCore core;
     core.set_program(&generator.ops);
